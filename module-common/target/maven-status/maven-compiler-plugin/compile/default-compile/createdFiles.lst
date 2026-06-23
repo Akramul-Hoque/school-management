@@ -1,0 +1,12 @@
+com\school\common\entity\BaseEntity.class
+com\school\common\exception\GlobalExceptionHandler.class
+com\school\common\security\CurrentUserProvider.class
+com\school\common\exception\BusinessRuleException.class
+com\school\common\config\JacksonConfig.class
+com\school\common\config\AuditingConfig.class
+com\school\common\model\PageResponse$PageResponseBuilder.class
+com\school\common\model\PageResponse.class
+com\school\common\config\OpenApiConfig.class
+com\school\common\exception\ResourceNotFoundException.class
+com\school\common\model\ApiResponse.class
+com\school\common\model\ApiResponse$ApiResponseBuilder.class
