@@ -1,0 +1,31 @@
+# Ignore Maven and build outputs
+**/target/
+*.class
+*.jar
+
+# IDEs
+.idea/
+*.iml
+out/
+.vscode/
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# Logs, env and OS files
+*.log
+.env
+Thumbs.db
+.DS_Store
+
+# H2 DB files
+*.h2.db
+
+# Node
+node_modules/
+
+# Misc
+.awcache
+.history

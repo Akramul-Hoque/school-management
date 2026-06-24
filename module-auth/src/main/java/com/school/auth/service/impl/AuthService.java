@@ -58,12 +58,16 @@ public class AuthService {
                 refreshToken.getToken(),
                 user.getUsername(),
                 user.getEmail(),
-                user.getRoles().stream().map(Role::getName).collect(Collectors.toSet())
-        );
+                user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()));
     }
 
     public TokenRefreshResponse refresh(TokenRefreshRequest request) {
         String tokenStr = request.getRefreshToken();
+        // Check redis blacklist first
+        Cache blacklist = cacheManager.getCache("refreshTokenBlacklist");
+        if (blacklist != null && blacklist.get(tokenStr) != null) {
+            throw new BusinessRuleException("Refresh token has been revoked");
+        }
         RefreshToken refreshToken = refreshTokenRepository.findByToken(tokenStr)
                 .orElseThrow(() -> new BusinessRuleException("Refresh token not found"));
 
@@ -82,10 +86,15 @@ public class AuthService {
                 .collect(Collectors.toList());
 
         String accessToken = jwtTokenProvider.generateToken(user.getUsername(), roles);
-        
+
         // Rotate refresh token
         refreshToken.setRevoked(true);
         refreshTokenRepository.save(refreshToken);
+
+        // Add the old token to the redis blacklist so it cannot be reused
+        if (blacklist != null) {
+            blacklist.put(tokenStr, true);
+        }
 
         RefreshToken newRefreshToken = createRefreshToken(user);
 
@@ -95,13 +104,26 @@ public class AuthService {
     public void logout(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
-        
+
         // Evict cached roles directly via CacheManager
         Cache cache = cacheManager.getCache("userRoles");
         if (cache != null) {
             cache.evict(user.getId());
         }
-        
+        // Fetch all refresh tokens for this user and add them to the blacklist before
+        // deleting
+        Cache blacklist = cacheManager.getCache("refreshTokenBlacklist");
+        try {
+            var tokens = refreshTokenRepository.findAllByUser(user);
+            if (blacklist != null) {
+                for (RefreshToken t : tokens) {
+                    blacklist.put(t.getToken(), true);
+                }
+            }
+        } catch (Exception e) {
+            // ignore - best-effort blacklist
+        }
+
         refreshTokenRepository.deleteByUser(user);
     }
 

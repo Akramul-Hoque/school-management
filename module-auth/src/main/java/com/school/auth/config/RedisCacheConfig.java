@@ -23,14 +23,16 @@ public class RedisCacheConfig {
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofHours(1))
                 .disableCachingNullValues()
-                .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
-                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()));
+                .serializeKeysWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
+                .serializeValuesWith(RedisSerializationContext.SerializationPair
+                        .fromSerializer(new GenericJackson2JsonRedisSerializer()));
 
         Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
-        
-        // Refresh token blacklist: 2 hours TTL
-        cacheConfigurations.put("refreshTokenBlacklist", defaultConfig.entryTtl(Duration.ofHours(2)));
-        
+
+        // Refresh token blacklist: match refresh token lifetime (7 days)
+        cacheConfigurations.put("refreshTokenBlacklist", defaultConfig.entryTtl(Duration.ofDays(7)));
+
         // User roles & Permissions: 24 hours TTL
         cacheConfigurations.put("userRoles", defaultConfig.entryTtl(Duration.ofHours(24)));
         cacheConfigurations.put("rolePermissions", defaultConfig.entryTtl(Duration.ofHours(24)));

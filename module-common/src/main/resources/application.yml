@@ -1,0 +1,57 @@
+## Postgres config (commented out for local H2 development)
+#spring:
+#  datasource:
+#    url: jdbc:postgresql://localhost:5432/school_erp
+#    username: ${DB_USER:school}
+#    password: ${DB_PASSWORD:school}
+#    hikari:
+#      pool-name: SchoolErpPool
+#      maximum-pool-size: 20
+#      minimum-idle: 5
+#      connection-timeout: 30000
+#      idle-timeout: 600000
+#      max-lifetime: 1800000
+#      leak-detection-threshold: 60000
+#  jpa:
+#    hibernate:
+#      ddl-auto: validate
+#    properties:
+#      hibernate:
+#        jdbc:
+#          batch_size: 50
+#        order_inserts: true
+#        order_updates: true
+#  flyway:
+#    enabled: false
+
+# H2 in-memory DB for local development/testing
+spring:
+  datasource:
+    url: jdbc:h2:mem:school_erp;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # Keep Flyway disabled by default for now
+  flyway:
+    enabled: false
+
+# Rabbit and redis defaults can be overridden per environment
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics"
