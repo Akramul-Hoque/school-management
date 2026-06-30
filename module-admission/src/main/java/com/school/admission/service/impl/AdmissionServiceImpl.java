@@ -1,89 +1,110 @@
 package com.school.admission.service.impl;
 
+import com.school.academic.service.api.AcademicService;
 import com.school.admission.dto.AdmissionApplicationDto;
-import com.school.admission.dto.AdmissionApplicationRequest;
 import com.school.admission.entity.AdmissionApplication;
-import com.school.admission.event.AdmissionApprovedEvent;
+import com.school.admission.mapper.AdmissionMapper;
 import com.school.admission.repository.AdmissionApplicationRepository;
 import com.school.admission.service.api.AdmissionService;
+import com.school.common.exception.BusinessRuleException;
 import com.school.common.exception.ResourceNotFoundException;
+import com.school.student.dto.GuardianDto;
+import com.school.student.dto.StudentDto;
+import com.school.student.service.api.StudentService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.amqp.core.AmqpTemplate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.time.LocalDate;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AdmissionServiceImpl implements AdmissionService {
 
-    private final AdmissionApplicationRepository repository;
-    private final AmqpTemplate amqpTemplate;
-    // StudentService is an external module dependency; call directly per architectural rule
-    private final com.school.student.service.api.StudentService studentService;
+    private final AdmissionApplicationRepository applicationRepository;
+    private final AdmissionMapper admissionMapper;
+    
+    private final AcademicService academicService;
+    private final StudentService studentService;
 
     @Override
     @Transactional
-    public AdmissionApplicationDto submit(AdmissionApplicationRequest req) {
-        AdmissionApplication a = new AdmissionApplication();
-        a.setApplicantName(req.getApplicantName());
-        a.setEmail(req.getEmail());
-        a.setPhone(req.getPhone());
-        a.setClassAppliedId(req.getClassAppliedId());
-        AdmissionApplication saved = repository.save(a);
-        return toDto(saved);
+    public AdmissionApplicationDto submitApplication(AdmissionApplicationDto dto) {
+        AdmissionApplication app = admissionMapper.toEntity(dto);
+        app.setApplicationNumber("APP-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        app.setStatus("PENDING");
+        return admissionMapper.toDto(applicationRepository.save(app));
+    }
+
+    @Override
+    public AdmissionApplicationDto getApplicationById(Long id) {
+        return admissionMapper.toDto(applicationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found")));
+    }
+
+    @Override
+    public Page<AdmissionApplicationDto> getApplicationsByStatus(String status, Pageable pageable) {
+        return applicationRepository.findByStatus(status, pageable).map(admissionMapper::toDto);
     }
 
     @Override
     @Transactional
-    public Long approveAndConvert(Long applicationId) {
-        AdmissionApplication a = repository.findById(applicationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + applicationId));
+    public void approveApplication(Long applicationId, Long sectionId) {
+        AdmissionApplication app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found"));
 
-        if (a.getStatus() != AdmissionApplication.Status.PENDING) {
-            throw new IllegalStateException("Only PENDING applications can be approved");
+        if (!"PENDING".equals(app.getStatus())) {
+            throw new BusinessRuleException("Application is already processed");
         }
 
-        // Call StudentService to create student in the same transaction
-        com.school.student.dto.StudentDto studentDto = studentService.createStudentFromApplication(toDto(a));
+        if (!academicService.isValidClassSection(app.getAppliedClassId(), sectionId)) {
+            throw new BusinessRuleException("Invalid section for the applied class");
+        }
 
-        a.setStatus(AdmissionApplication.Status.APPROVED);
-        repository.save(a);
+        app.setStatus("APPROVED");
+        applicationRepository.save(app);
 
-        // Publish event to RabbitMQ so other modules (fee, notification) can consume
-        AdmissionApprovedEvent event = new AdmissionApprovedEvent(a.getId(), studentDto.getId(), a.getEmail());
-        amqpTemplate.convertAndSend("admission.exchange", "admission.approved", event);
+        // Map to StudentDto and call Student module synchronously
+        StudentDto studentDto = new StudentDto();
+        studentDto.setFirstName(app.getFirstName());
+        studentDto.setLastName(app.getLastName());
+        studentDto.setEmail(app.getEmail());
+        studentDto.setDateOfBirth(app.getDateOfBirth());
+        studentDto.setGender(app.getGender());
+        studentDto.setAdmissionDate(LocalDate.now());
+        studentDto.setActive(true);
+        studentDto.setStudentCode("STU-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase());
+        studentDto.setCurrentClassId(app.getAppliedClassId());
+        studentDto.setCurrentSectionId(sectionId);
+        studentDto.setCurrentSessionId(app.getAppliedSessionId());
+        
+        GuardianDto guardianDto = new GuardianDto();
+        guardianDto.setFirstName(app.getGuardianFirstName());
+        guardianDto.setLastName(app.getGuardianLastName());
+        guardianDto.setEmail(app.getGuardianEmail());
+        guardianDto.setPhoneNumber(app.getGuardianPhone());
+        guardianDto.setRelationToStudent(app.getGuardianRelation());
+        studentDto.setGuardian(guardianDto);
 
-        return studentDto.getId();
-    }
-
-    @Override
-    public AdmissionApplicationDto getById(Long id) {
-        AdmissionApplication a = repository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + id));
-        return toDto(a);
+        // Direct call across modules in same transaction
+        studentService.createStudentFromApplication(studentDto);
     }
 
     @Override
     @Transactional
-    public void reject(Long id) {
-        AdmissionApplication a = repository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + id));
-        a.setStatus(AdmissionApplication.Status.REJECTED);
-        repository.save(a);
-    }
+    public void rejectApplication(Long applicationId) {
+        AdmissionApplication app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found"));
 
-    private AdmissionApplicationDto toDto(AdmissionApplication a) {
-        AdmissionApplicationDto d = new AdmissionApplicationDto();
-        d.setId(a.getId());
-        d.setApplicantName(a.getApplicantName());
-        d.setEmail(a.getEmail());
-        d.setPhone(a.getPhone());
-        d.setClassAppliedId(a.getClassAppliedId());
-        d.setStatus(a.getStatus().name());
-        d.setCreatedAt(a.getCreatedAt());
-        return d;
+        if (!"PENDING".equals(app.getStatus())) {
+            throw new BusinessRuleException("Application is already processed");
+        }
+
+        app.setStatus("REJECTED");
+        applicationRepository.save(app);
     }
 }

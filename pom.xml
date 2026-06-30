@@ -30,6 +30,10 @@
     <modules>
         <module>module-common</module>
         <module>module-auth</module>
+        <module>module-hr</module>
+        <module>module-academic</module>
+        <module>module-student</module>
+        <module>module-admission</module>
     </modules>
 
     <dependencyManagement>
@@ -43,6 +47,26 @@
             <dependency>
                 <groupId>com.school</groupId>
                 <artifactId>module-auth</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.school</groupId>
+                <artifactId>module-hr</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.school</groupId>
+                <artifactId>module-academic</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.school</groupId>
+                <artifactId>module-student</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.school</groupId>
+                <artifactId>module-admission</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

@@ -11,9 +11,9 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>module-admission</artifactId>
-    <name>Module Admission</name>
-    <description>Student admissions and applicant management</description>
+    <artifactId>module-student</artifactId>
+    <name>Module Student</name>
+    <description>Student master records, IDs, promotion, transfer certificates</description>
 
     <dependencies>
         <dependency>
@@ -28,10 +28,6 @@
             <groupId>com.school</groupId>
             <artifactId>module-academic</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.school</groupId>
-            <artifactId>module-student</artifactId>
-        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -40,6 +36,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
         </dependency>
 
         <dependency>
